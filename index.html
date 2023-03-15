@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  margin: 20;
+  background-color: #f2f2f2;
+}
+
+.button {
+    background-color: #6e46cb;
+    border-radius: 25px;
+    color: white;
+    padding: 15px 32px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 4px 2px;
+    cursor: pointer;
+}
+.slidecontainer {
+  width: 100%;
+}
+
+.slider {
+  -webkit-appearance: none;
+  max-width: 620px;
+  width: 100%;
+  height: 15px;
+  border-radius: 5px;
+  background: #d3d3d3;
+  outline: none;
+  opacity: 0.7;
+  -webkit-transition: .2s;
+  transition: opacity .2s;
+}
+
+.slider:hover {
+  opacity: 1;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  background: #6361c3;
+  cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  background: #5443c1;
+  cursor: pointer;
+}
+</style>
+</head>
+<body>
+
+<h1>Chess Piece SDK</h1>
+
+<h2>Connect your Lumen</h2>
+
+<form>
+    <input class="button" type="button" value="Connect device 🔌" onclick="discoverDevices()">
+</form>
+<form>
+    <input class="button" type="button" value="Disconnect device 💀" onclick="disconnect()">
+</form>
+
+<h2>Move the slider to adjust the intensity of the vibration 💓</h2>
+
+<div class="slidecontainer">
+  <input type="range" min="1" max="100" value="50" class="slider" id="intensityRange">
+  <p>Value: <span id="intensity"></span></p>
+</div>
+
+<h2>Set the duration of the vibration 😊</h2>
+
+<div class="inputduration">
+  <input type="number" step="1" min="1" max="60" value="5" id="duration">
+</div>
+
+<h2>Press to vibrate</h2>
+
+<form>
+    <input type="button" class="button" value="Vibrate 💡" onclick="writeToDevice()">
+</form>
+
+<script>
+const intensity = document.getElementById("intensityRange");
+const duration = document.getElementById("duration").value;
+const outputIntensity = document.getElementById("intensity");
+const charUuid = 'a0d70002-4c16-4ba7-977a-d394920e13a3';
+const serviceUuid = 'a0d70001-4c16-4ba7-977a-d394920e13a3';
+let characteristic;
+
+outputIntensity.innerHTML = intensity.value;
+
+intensity.oninput = function() {
+  outputIntensity.innerHTML = this.value;
+}
+
+function discoverDevices() {
+    navigator.bluetooth.requestDevice({
+        filters: [{
+            name: 'OhMiBod LUMEN'
+        }],
+        optionalServices: [serviceUuid]
+    })
+    .then(device => {
+        return device.gatt.connect();
+    })
+    .then(server => {return server.getPrimaryService(serviceUuid)})
+    .then(service => {return service.getCharacteristic(charUuid)})
+    .then(_characteristic => {
+        characteristic = _characteristic;
+    })
+    .catch(error => { console.error(error); });
+}
+function disconnect() {
+    navigator.bluetooth.getDevices().then(devices => {
+        devices.forEach(device => {
+            device.gatt.disconnect();
+        });
+    });
+}
+function writeToDevice() {
+    const value = new Uint8Array([0x01, intensity.value]);
+    characteristic.writeValue(value)
+        .then(() => { 
+            setTimeout(() => {
+                const value = new Uint8Array([0x01, 0x00]);
+                characteristic.writeValue(value)
+                    .then(() => { 
+                        console.log('stop!');
+                    })
+                    .catch(error => { console.error(error); });
+            }, duration * 1000);
+            console.log('start vibrating!');
+        })
+        .catch(error => { console.error(error); });
+}
+</script>
+
+</body>
+</html>
