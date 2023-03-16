@@ -21,6 +21,7 @@ body {
     margin: 4px 2px;
     cursor: pointer;
 }
+
 .slidecontainer {
   width: 100%;
 }
@@ -65,7 +66,7 @@ body {
 
 <h1>Chess Piece SDK</h1>
 
-<h2>Connect your Lumen</h2>
+<h2 id="status">Connect your Lumen</h2>
 
 <form>
     <input class="button" type="button" value="Connect device 🔌" onclick="discoverDevices()">
@@ -81,10 +82,10 @@ body {
   <p>Value: <span id="intensity"></span></p>
 </div>
 
-<h2>Set the duration of the vibration 😊</h2>
+<h2>Set the duration of the vibration in seconds😊</h2>
 
 <div class="inputduration">
-  <input type="number" step="1" min="1" max="60" value="5" id="duration">
+  <input type="number" min="1" max="60" value="5" id="duration" name="duration">
 </div>
 
 <h2>Press to vibrate</h2>
@@ -94,12 +95,14 @@ body {
 </form>
 
 <script>
+const status = document.getElementById("status");
 const intensity = document.getElementById("intensityRange");
-const duration = document.getElementById("duration").value;
+const duration = document.getElementById("duration");
 const outputIntensity = document.getElementById("intensity");
 const charUuid = 'a0d70002-4c16-4ba7-977a-d394920e13a3';
 const serviceUuid = 'a0d70001-4c16-4ba7-977a-d394920e13a3';
 let characteristic;
+let device;
 
 outputIntensity.innerHTML = intensity.value;
 
@@ -107,45 +110,34 @@ intensity.oninput = function() {
   outputIntensity.innerHTML = this.value;
 }
 
-function discoverDevices() {
-    navigator.bluetooth.requestDevice({
+async function discoverDevices() {
+    device = await navigator.bluetooth.requestDevice({
         filters: [{
-            name: 'OhMiBod LUMEN'
+            services: [serviceUuid],
         }],
         optionalServices: [serviceUuid]
-    })
-    .then(device => {
-        return device.gatt.connect();
-    })
-    .then(server => {return server.getPrimaryService(serviceUuid)})
-    .then(service => {return service.getCharacteristic(charUuid)})
-    .then(_characteristic => {
-        characteristic = _characteristic;
-    })
-    .catch(error => { console.error(error); });
-}
-function disconnect() {
-    navigator.bluetooth.getDevices().then(devices => {
-        devices.forEach(device => {
-            device.gatt.disconnect();
-        });
     });
+    status.innerHTML = device ? `Connected to ${device.name}😍`: 'No device found🧐';
+    device.addEventListener('gattserverdisconnected', onDisconnected);
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService(serviceUuid);
+    characteristic = await service.getCharacteristic(charUuid);
 }
-function writeToDevice() {
+
+function onDisconnected(event) {
+    const device = event.target;
+    status.innerHTML = `${device.name} has been disconnected.🥺\nConnect to use it again!`;
+}
+async function disconnect() {
+    await device.gatt.disconnect();
+}
+async function writeToDevice() {
     const value = new Uint8Array([0x01, intensity.value]);
-    characteristic.writeValue(value)
-        .then(() => { 
-            setTimeout(() => {
-                const value = new Uint8Array([0x01, 0x00]);
-                characteristic.writeValue(value)
-                    .then(() => { 
-                        console.log('stop!');
-                    })
-                    .catch(error => { console.error(error); });
-            }, duration * 1000);
-            console.log('start vibrating!');
-        })
-        .catch(error => { console.error(error); });
+    setTimeout(async () => {
+        const value = new Uint8Array([0x01, 0x00]);
+        await characteristic.writeValue(value);
+    }, duration.value * 1000);
+    await characteristic.writeValue(value);
 }
 </script>
 
